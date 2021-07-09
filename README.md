@@ -1,4 +1,4 @@
-# inventory
+# GBC Inventory
 work-in-progress
 
 europepmc r package
