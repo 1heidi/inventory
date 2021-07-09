@@ -32,3 +32,23 @@ journal_stats <- select(journal_stats,2, 8:11)
 journal_stats <- distinct(journal_stats)
 
 write.csv(journal_stats,"wren_journal_stats.csv", row.names = FALSE) 
+
+
+## for 2011 on...
+
+wren_master_2011_2015 <- filter(wren_master, pub_year >2011)
+wren_master_2011_2015 <- filter(wren_master_2011_2015, off_class != "NA" & off_class != "no_URL")
+
+journal_count_2011_2015 <- wren_master_2011_2015 %>% count(journal)
+
+journal_stats_2011_2015 <- wren_master_2011_2015 %>%
+  group_by(journal) %>%
+    mutate(all = sum(length(url))) %>%
+      mutate(db = sum(off_class == "a_database")) %>%
+         mutate(program = sum(off_class == "a_program")) %>%
+           mutate(other = sum(off_class == "other"))
+
+journal_stats_2011_2015 <- select(journal_stats_2011_2015,2, 8:11)
+wren_journal_stats_2011_2015 <- distinct(journal_stats_2011_2015)
+
+write.csv(wren_journal_stats_2011_2015 ,"wren_journal_stats_2011_2015.csv", row.names = FALSE) 
