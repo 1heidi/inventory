@@ -14,9 +14,36 @@ write.csv(pmc_24k,"pmc_list_all_2021-07-09.csv", row.names = FALSE)
 
 #=============================================================================#
 
-
 pmc_24k <- read_csv("pmc_list_all_2021-07-09.csv")
 
+##check for NA ids....
+sum(is.na(pmc_24k$id)) ## 0
+
+## try first 5K records to see how long it takes ... 
+## ~30 min
+set1 <- slice(pmc_24k, 1:4999)
+set1_list <-set1$id
+
+y  <- NULL;
+
+for (i in set1_list) {
+  r <- sapply(i, epmc_details) 
+  id <- r[[1]]["id"]
+  title <- r[[1]]["title"]
+  abstract <- r[[1]]["abstractText"]
+  report <- cbind(id, title, abstract)
+  y <- rbind(y, report)
+}
+
+#rename
+abstracts_1_4999 <- y
+
+#find failed queries -> PMCID and others
+lost_1_4999 <- anti_join(set1, abstracts_1_4999, by = "id")
+
+## Extract URLs
+url_pattern <- "http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
+abstracts_1_4999$ContentURL <- str_extract(abstracts_1_4999$abstractText, url_pattern)
                                             
 ## WORK AREA ##
 
@@ -49,36 +76,7 @@ test3 <- filter(test, data != "data_found")
 # https://doi.org/10.1093/nar/gkaa857
 
 test_full_text <- epmc_ftxt("PMC7778997") ## not working?
-test_details1 <- epmc_details(ext_id = 33068435)
-
-#### EXTRACTING FT for ABSTRACTS ####
-
-##check for NA ids....
-sum(is.na(pmc_24k$id))
-
-sam <- pmc_24k[sample(nrow(pmc_24k), 9), ]
-test_list <- sam$id
-
-## up to here, this works
-
-y  <- NULL;
-
-for (i in test_list) {
-  test <- sapply(i, epmc_details) 
-  id <- test[[1]]["id"]
-  title <- test[[1]]["title"]
-  abstract <- test[[1]]["abstractText"]
-  report <- cbind(id, title, abstract)
-  y <- rbind(y, report)
-}
-
-#rename
-abstracts <- y
-    
-    
-
-
-
+test_details <- epmc_details(ext_id = 33068435)
 
 ## from epmc_details can get ...
 ## * basic -> affiliation - DO NOT USE ... first author affiliation only
