@@ -25,6 +25,7 @@ sum(is.na(pmc_24k$id)) ## 0
 set1 <- slice(pmc_24k, 1:4999)
 set1_list <-set1$id
 
+## add pub year
 y  <- NULL;
 for (i in set1_list) {
   r <- sapply(i, epmc_details) 
@@ -75,32 +76,51 @@ abstracts_1_4999 <- rbind(abstracts_1_4999, lost_found)
 ## Extract URLs
 url_pattern <- "http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
 abstracts_1_4999$ContentURL <- str_extract(abstracts_1_4999$abstractText, url_pattern)
-##Clean URLs iteratively
-abstracts_1_4999$ContentURL <- gsub("<.*$", "", abstracts_1_4999$ContentURL) 
-abstracts_1_4999$ContentURL <-gsub("[.)-;:?*&>]$", "", abstracts_1_4999$ContentURL)
-abstracts_1_4999$ContentURL <-gsub("[.)-;:?*&>]$", "", abstracts_1_4999$ContentURL)
+##length to eval over long and over short
+abstracts_1_4999$URL_length <- nchar(abstracts_1_4999$ContentURL)
+
+##Clean URLs iteratively, add in new column next, also add last character column
+abstracts_1_4999$cleaned_URL <- NA
+abstracts_1_4999$cleaned_URL_last <- NA
+
+abstracts_1_4999$cleaned_URL <- gsub("<.*$", "", abstracts_1_4999$ContentURL) 
+abstracts_1_4999$cleaned_URL_last <- substr(abstracts_1_4999$cleaned_URL,(nchar(abstracts_1_4999$cleaned_URL)+1)-1,nchar(abstracts_1_4999$cleaned_URL))
+abstracts_1_4999$cleaned_URL <-gsub("[.)-;:?*&>]$", "", abstracts_1_4999$cleaned_URL)
+abstracts_1_4999$cleaned_URL_last <- substr(abstracts_1_4999$cleaned_URL,(nchar(abstracts_1_4999$cleaned_URL)+1)-1,nchar(abstracts_1_4999$cleaned_URL))
+abstracts_1_4999$cleaned_URL <-gsub("[.)]$", "", abstracts_1_4999$cleaned_URL)
+abstracts_1_4999$cleaned_URL_last <- substr(abstracts_1_4999$cleaned_URL,(nchar(abstracts_1_4999$cleaned_URL)+1)-1,nchar(abstracts_1_4999$cleaned_URL))
+
 ##will still have a little junk but ok for now
+
+## remove URL = NA (just found WWW, etc in abstract) and dedup cleaned URLs
+
 ## title key words
 abstracts_1_4999 <- mutate(abstracts_1_4999, title_cat = ifelse(test = grepl("data", abstracts_1_4999$title, ignore.case = T),
                                                     yes = "data",
                                                     no = ifelse(test =  grepl("base", abstracts_1_4999$title, ignore.case = T),
                                                                 yes = "base",
-                                                                no = ifelse(test = grepl("db", test$title, ignore.case = T),
+                                                                no = ifelse(test = grepl("db", abstracts_1_4999$title, ignore.case = T),
                                                                             yes = "db",
-                                                                            no = ifelse(test = grepl("model", test$title, ignore.case = T),
+                                                                            no = ifelse(test = grepl("model", abstracts_1_4999$title, ignore.case = T),
                                                                                         yes = "model",
-                                                                                        no = ifelse(test = grepl("server", test$title, ignore.case = T),
+                                                                                        no = ifelse(test = grepl("server", abstracts_1_4999$title, ignore.case = T),
                                                                                                     yes = "server",
-                                                                                                    no = ifelse(test = grepl("program", test$title, ignore.case = T),
-                                                                                                                yes = "program",
-                                                                                                                no = ifelse(test = grepl("study", test$title, ignore.case = T),
+                                                                                                    no = ifelse(test = grepl("tool", abstracts_1_4999$title, ignore.case = T),
+                                                                                                                yes = "tool",
+                                                                                                                no = ifelse(test = grepl("study", abstracts_1_4999$title, ignore.case = T),
                                                                                                                             yes = "study",
-                                                                                                                            no = "other"))))))))
+                                                                                                                            no = ifelse(test = grepl("package", abstracts_1_4999$title, ignore.case = T),
+                                                                                                                                        yes = "package",
+                                                                                                                                        no = ifelse(test = grepl("program", abstracts_1_4999$title, ignore.case = T),
+                                                                                                                                                    yes = "program",
+                                                                                                                                                    no = "other"))))))))))
+                                                                                                                                                 
+                                                                                                                                                    
+
 ## check count quick
 t1 <- abstracts_1_4999 %>% count(title_cat)
-
+## save file
 write.csv(abstracts_1_4999,"abstracts_1_4999_2021-07-23.csv", row.names = FALSE) 
-
 
 #============================## WORK AREA ##===============================#
 
@@ -113,9 +133,12 @@ test_status_list <- abstracts_1_4999$ContentURL
 #   SSL: no alternative certificate subject name matches target host name 'echinobase.org'
 
 ##URL testing loop
-## start 2:43 PM
-##
 ## do a job next time https://blog.rstudio.com/2019/03/14/rstudio-1-2-jobs/
+## several hundred duplicated
+## ***** NEEDS TROUBLE SHOOTING ****
+## returned URL is different than sent 
+## need to print issue
+
 test_status  <- NULL;
 for (i in test_status_list) {
   delayedAssign("do.next", {next})
@@ -125,17 +148,17 @@ for (i in test_status_list) {
   report <- cbind(ContentURL, status_code)
   test_status <- as.data.frame(rbind(test_status, report))
 }
-## several hundred duplicated
-## many should have returned but didn't
-## ***** NEEDS TROUBLE SHOOTING ****
+
 test_status_dedup <- unique(test_status) 
 write.csv(test_status_dedup,"abstracts_1_4999_test_status_2021-07-23.csv", row.names = FALSE) 
 
 ## ***** NEEDS TROUBLE SHOOTING ****
-abstracts_1_4999_URL_checked <- left_join(abstracts_1_4999, test_status, by="ContentURL")
+
+abstracts_1_4999_URL_checked <- read_csv("abstracts_1_4999_test_status_2021-07-23.csv")
+URL_join_check <- left_join(abstracts_1_4999, abstracts_1_4999_URL_checked, by="ContentURL")
 
 ##check for failed URL handoffs
-sum(is.na(abstracts_1_4999_URL_checked$status_code))
+sum(is.na(URL_join_check$status_code))
 ##summarize results
 summary_URL_checks_1_4999 <- aggregate(abstracts_1_4999_URL_checked$status_code, by=list(status_code=abstracts_1_4999_URL_checked$status_code), FUN=sum)
 
