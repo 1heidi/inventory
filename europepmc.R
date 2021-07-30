@@ -92,7 +92,7 @@ abstracts_1_4999$cleaned_URL_last <- substr(abstracts_1_4999$cleaned_URL,(nchar(
 
 ##will still have a little junk but ok for now
 
-## remove URL = NA (just found WWW, etc in abstract) and dedup cleaned URLs
+##### NEXT ... remove URL = NA (just found WWW, etc in abstract) and dedup cleaned URLs ####
 
 ## title key words
 abstracts_1_4999 <- mutate(abstracts_1_4999, title_cat = ifelse(test = grepl("data", abstracts_1_4999$title, ignore.case = T),
@@ -124,48 +124,10 @@ write.csv(abstracts_1_4999,"abstracts_1_4999_2021-07-23.csv", row.names = FALSE)
 
 #============================## WORK AREA ##===============================#
 
-#retrieve status codes
-test_status_list <- abstracts_1_4999$ContentURL
-
-# NOTE: websites that aren't secure or throw other kinds of hand-off errors are ignored via 
-# tryCatch function e.g. see this return -- GET("https://echinobase.org")...
-# Error in curl::curl_fetch_memory(url, handle = handle) : 
-#   SSL: no alternative certificate subject name matches target host name 'echinobase.org'
-
-##URL testing loop
-## do a job next time https://blog.rstudio.com/2019/03/14/rstudio-1-2-jobs/
-## several hundred duplicated
-## ***** NEEDS TROUBLE SHOOTING ****
-## returned URL is different than sent 
-## need to print issue
-
-test_status  <- NULL;
-for (i in test_status_list) {
-  delayedAssign("do.next", {next})
-  r <- tryCatch(sapply(i, GET), error = function(e) force(do.next))
-  ContentURL <- r[[1]]
-  status_code <- r[[2]]
-  report <- cbind(ContentURL, status_code)
-  test_status <- as.data.frame(rbind(test_status, report))
-}
-
-test_status_dedup <- unique(test_status) 
-write.csv(test_status_dedup,"abstracts_1_4999_test_status_2021-07-23.csv", row.names = FALSE) 
-
-## ***** NEEDS TROUBLE SHOOTING ****
-
-abstracts_1_4999_URL_checked <- read_csv("abstracts_1_4999_test_status_2021-07-23.csv")
-URL_join_check <- left_join(abstracts_1_4999, abstracts_1_4999_URL_checked, by="ContentURL")
-
-##check for failed URL handoffs
-sum(is.na(URL_join_check$status_code))
-##summarize results
-summary_URL_checks_1_4999 <- aggregate(abstracts_1_4999_URL_checked$status_code, by=list(status_code=abstracts_1_4999_URL_checked$status_code), FUN=sum)
-
-##examine last characters of URL string
-n = 5
-last_char <- unique(as.data.frame(substr(test_1_4999$ContentURL,(nchar(test_1_4999$ContentURL)+1)-n,nchar(test_1_4999$ContentURL))))
-
+## viewing single abstracts
+print <- abstracts_1_4999[18,]
+View(print)
+print$abstractText
 
 ## am I at least catching all the journals in this time frame?
 wren_journal_stats_2011_2015 <- read_csv("wren_journal_stats_2011_2015.csv")
@@ -182,27 +144,6 @@ length(wren_journal_stats_2011_2015$journal)
 
 ## 36 out of 8885 urls = 0.4%
 ## 33 out of 1570 for this time period = 2% 
-
-## data in title 
-
-test <- mutate(abstracts_1_4999, title_cat = ifelse(test = grepl("data", abstracts_1_4999$title, ignore.case = T),
-                                 yes = "data",
-                                 no = ifelse(test =  grepl("base", abstracts_1_4999$title, ignore.case = T),
-                                             yes = "base",
-                                             no = ifelse(test = grepl("db", test$title, ignore.case = T),
-                                                         yes = "db",
-                                                         no = ifelse(test = grepl("model", test$title, ignore.case = T),
-                                                                    yes = "model",
-                                                                    no = ifelse(test = grepl("server", test$title, ignore.case = T),
-                                                                                yes = "server",
-                                                                                no = ifelse(test = grepl("program", test$title, ignore.case = T),
-                                                                                            yes = "program",
-                                                                                            no = ifelse(test = grepl("study", test$title, ignore.case = T),
-                                                                                                        yes = "study",
-                                                                                                        no = "other"))))))))
-
-t1 <- test %>% count(title_cat)
-
 
 ## Testing epmc returns
 # Huang, et al 2020
