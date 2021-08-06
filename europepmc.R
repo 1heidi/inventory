@@ -25,7 +25,7 @@ sum(is.na(pmc_24k$id)) ## 0
 set1 <- slice(pmc_24k, 1:4999)
 set1_list <-set1$id
 
-## add pub year
+## add pub years
 y  <- NULL;
 for (i in set1_list) {
   r <- sapply(i, epmc_details) 
