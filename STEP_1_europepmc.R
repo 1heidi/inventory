@@ -1,48 +1,49 @@
-##Purpose: Retrieve records from Europe PMC and clean initial "seed set" before classification
-##Parts: 1) retrieve initial records from query, 2) retrieve abstracts, 3) extract and clean URLs from abstracts
+## Purpose: Retrieve records from Europe PMC and clean initial "seed set" before classification
+## Parts: 1) retrieve initial records from query, 2) retrieve abstracts, 3) extract and clean URLs from abstracts
 ## and 4) find string matches b/t title and URLs
-##Package(s): europepmc, tidyverse, stringr, httr
-##Input file(s): manual_checks_hji_2021-07-28.csv
-##Output file(s): pmc_seed_all_2021-08-06.csv, (temp!) abstracts_1_4999_2021-08-06.csv
-##NOTE: depending on Europe PMC query, will need to check ids that do not return w/ details, URL cleaning efficacy, etc. There
-## are some very stubborn strings that aren't excluded in the query despite trying (especially re: clinical trials registries)
+## Package(s): europepmc, tidyverse, stringr, httr
+## Input file(s): manual_checks_hji_2021-07-28.csv
+## Output file(s): pmc_seed_all_2021-08-06.csv, (temp!) abstracts_1_4999_2021-08-06.csv
+## NOTE: depending on Europe PMC query, will need to check ids that do not return w/ details, URL cleaning efficacy, etc. There
+## are some very stubborn strings that aren't excluded in the query despite trying (especially re: clinical trial registries).
 
 library(europepmc)
 library(tidyverse)
 library(stringr)
 library(httr)
 
-#===================================================================##
+##====================================================================##
 ####### PART 1: get seed set via query string built [2021-08-06] ####### 
-#===================================================================##
+##====================================================================##
 
 my_query <- '(((ABSTRACT:"www" OR ABSTRACT:"http" OR ABSTRACT:"https") AND (ABSTRACT:"data" OR ABSTRACT:"resource" OR ABSTRACT:"database"))  NOT (TITLE:"retraction" OR TITLE:"retracted" OR TITLE:"withdrawn" OR TITLE:"withdrawal" OR TITLE:"erratum") NOT ((ABSTRACT:"retract" OR ABSTRACT:"withdraw" ABSTRACT:"erratum" OR ABSTRACT:"github.com" OR ABSTRACT:"github.io" OR ABSTRACT:"cran.r" OR ABSTRACT:"youtube.com" OR ABSTRACT:"bitbucket.org" OR ABSTRACT:"links.lww.com" OR ABSTRACT:"osf.io" OR ABSTRACT:"bioconductor.org" OR ABSTRACT:"annualreviews.org" OR ABSTRACT:"creativecommons.org" OR ABSTRACT:"sourceforge.net" OR ABSTRACT:".pdf" OR ABSTRACT:"clinical trial" OR ABSTRACT:"registry" OR ABSTRACT:"registration" OR ABSTRACT:"trial registration" OR ABSTRACT:"clinicaltrial" OR ABSTRACT:"registration number" OR ABSTRACT:"pre-registration" OR ABSTRACT:"preregistration"))) AND (((SRC:MED OR SRC:PMC OR SRC:AGR OR SRC:CBA))) AND (FIRST_PDATE:[2011 TO 2021])'
 pmc_seed <- epmc_search(query=my_query, limit = 25000)
 
-##a few checks, not a good time to de-dup later
-sum(is.na(pmc_seed$id)) ## 2
+##a few checks (fyi - not a good time to de-dup, do later)
+sum(is.na(pmc_seed$id)) ## usually a few all NA row return
 pmc_seed <- filter(pmc_seed, !is.na(pmc_seed$id))
 year_counts <-count(pmc_seed, pubYear) ## a few pre-2011 years may sneak in
 pmc_seed <- filter(pmc_seed, pmc_seed$pubYear > 2010)
 year_counts <-count(pmc_seed, pubYear) ##check for craziness
 journal_counts <-count(pmc_seed, journalTitle) ##check for craziness
 
-##save entire seed set
+##save entire seed set - update date
 write.csv(pmc_seed,"pmc_seed_all_2021-08-06.csv", row.names = FALSE) ## 21,235 total records
 
-#============================================================================================##
+##===========================================================================================##
 #######  PART 2: starting with entire seed set, query detailed records to get abstracts ####### 
-#============================================================================================##
+##===========================================================================================##
 
 pmc_seed <- read.csv("pmc_seed_all_2021-08-06.csv")
-manual_checks <- read.csv("manual_checks_hji_2021-07-28.csv")
+manual_checks <- read.csv("manual_checks_hji_2021-07-28.csv") ## manaully curated set
 
-## using 5K records first 
-##include the 653 manually checked already
+## using 5K records first in developing workflow
+## include the 653 manually checked already
 man_list <-manual_checks$id
 set1 <- slice(pmc_seed, 10001:14346)
 set1_list <-set1$id
 
+## retrieve details from Europe PMC
 y  <- NULL;
 for (i in set1_list) {
   r <- sapply(i, epmc_details) 
@@ -62,7 +63,7 @@ names(set1_list)[names(set1_list)=="c(set1_list, man_list)"] <- "id"
 lost_1_4999 <- anti_join(set1_list, abstracts_1_4999, by = "id")
 lost_1_4999 <- right_join(pmc_seed, lost_1_4999, by = "id")
 
-# check but failures largely due to source
+# check, but failures largely due to source
 source_check <- lost_1_4999 %>% count(source)
 
 ### retrieve those lost by source - PMC & ARC & MED ### 
@@ -104,16 +105,16 @@ lost_found <- rbind(lost_agr, lost_pmc, lost_med)
 abstracts_1_4999 <- rbind(abstracts_1_4999, lost_found)
 check_dup_id <- data.frame(table(abstracts_1_4999$id)) ## doubling checking
 
-#============================================================##
+##===========================================================##
 #######  Part 3 - extract and clean URLs from abstracts ####### 
-#============================================================##
+##===========================================================##
 
 url_pattern <- "http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
 abstracts_1_4999$ContentURL <- str_extract(abstracts_1_4999$abstractText, url_pattern)
 ##some have no URLs - there was just WWW or HTTP(S) in the abstract
 abstracts_1_4999 <- filter(abstracts_1_4999, !is.na(abstracts_1_4999$ContentURL))
 
-## Iterative cleaning of URLs, add in new column for comparison, also add last character column for checks
+## Iterative cleaning of URLs to trim off the junk, add in new column for comparison, also add last character column for checks
 abstracts_1_4999$cleaned_URL <- NA
 abstracts_1_4999$cleaned_URL_last <- NA
 
@@ -128,7 +129,7 @@ abstracts_1_4999$cleaned_URL_last <- substr(abstracts_1_4999$cleaned_URL,(nchar(
 
 url_check <-count(abstracts_1_4999, cleaned_URL_last) ##may still have a little junk (~10) but ok enough
 
-##### check dup cleaned URLs - remove very stubborn junk - may need to be more on whole seed set ####
+##### check for duplicated cleaned URLs - remove very stubborn junk - may need to be more on whole seed set ####
 abstracts_1_4999$cleaned_URL <- gsub('\\s+', '', abstracts_1_4999$cleaned_URL)
 abstracts_1_4999 <- abstracts_1_4999[!grepl("clinicaltrials",abstracts_1_4999$cleaned_URL),]
 abstracts_1_4999 <- abstracts_1_4999[!grepl("https://www.clinicaltrials.gov",abstracts_1_4999$cleaned_URL),] ## stupidly, this is necessary
@@ -145,11 +146,11 @@ check_dup_url <- data.frame(table(abstracts_1_4999$cleaned_URL))
 keep <- select(pmc_seed, 1, 8, 9, 11, 12)
 abstracts_1_4999 <- right_join(keep, abstracts_1_4999, by ="id")
 
-#===================================================================##
-####### PART 4: Find matching strings between Titles and URLs  ####### 
-#===================================================================##
+##==================================================================##
+####### PART 4: Find matching strings between titles and URLs  ####### 
+##==================================================================##
 
-## will help for 1) de-publication down to one resource per inventory and 2) for resource naming
+## will help for 1) de-publication down to one resource for the inventory and 2) for resource naming
 ## e.g. in title = "Integration of 1:1 orthology maps and updated datasets into Echinobase."
 ## URL = "https://echinobase.org"
 ## => "echinobase"
@@ -169,10 +170,10 @@ for (row in 1:nrow(abstracts_1_4999)) {
 abstracts_1_4999 <- right_join(abstracts_1_4999, matches, by = "id")
 abstracts_1_4999 <- select(abstracts_1_4999, 1, 6, 4, 2, 5, 3, 5, 7, 8:11)
 
-## save file
+## save file - updated date 
 write.csv(abstracts_1_4999,"abstracts_1_4999_2021-08-06.csv", row.names = FALSE) 
 
-#============================## WORK AREA ##===============================#
+##============================## WORK AREA ##===============================#
 
 ## viewing single abstracts
 print <- abstracts_1_4999[18,]
