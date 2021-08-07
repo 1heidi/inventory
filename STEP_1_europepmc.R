@@ -1,5 +1,6 @@
 ##Purpose: Retrieve records from Europe PMC and clean initial "seed set" before classification
 ##Parts: 1) retrieve initial records from query, 2) retrieve abstracts, 3) extract and clean URLs from abstracts
+## and 4) find string matches b/t title and URLs
 ##Package(s): europepmc, tidyverse, stringr, httr
 ##Input file(s): manual_checks_hji_2021-07-28.csv
 ##Output file(s): pmc_seed_all_2021-08-06.csv, (temp!) abstracts_1_4999_2021-08-06.csv
@@ -64,7 +65,7 @@ lost_1_4999 <- right_join(pmc_seed, lost_1_4999, by = "id")
 # check but failures largely due to source
 source_check <- lost_1_4999 %>% count(source)
 
-# retrieve those lost by source - PMC & ARC & MED
+### retrieve those lost by source - PMC & ARC & MED ### 
 
 lost_list <- lost_1_4999$id
 
@@ -109,10 +110,10 @@ check_dup_id <- data.frame(table(abstracts_1_4999$id)) ## doubling checking
 
 url_pattern <- "http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
 abstracts_1_4999$ContentURL <- str_extract(abstracts_1_4999$abstractText, url_pattern)
-##some have no URLs - there was just WWW or HTTP in the abstract
+##some have no URLs - there was just WWW or HTTP(S) in the abstract
 abstracts_1_4999 <- filter(abstracts_1_4999, !is.na(abstracts_1_4999$ContentURL))
 
-##Clean URLs iteratively, add in new column next, also add last character column
+## Iterative cleaning of URLs, add in new column for comparison, also add last character column for checks
 abstracts_1_4999$cleaned_URL <- NA
 abstracts_1_4999$cleaned_URL_last <- NA
 
@@ -127,7 +128,7 @@ abstracts_1_4999$cleaned_URL_last <- substr(abstracts_1_4999$cleaned_URL,(nchar(
 
 url_check <-count(abstracts_1_4999, cleaned_URL_last) ##may still have a little junk (~10) but ok enough
 
-##### check dup cleaned URLs - remove very stubborn junk - may need to be more on whole seed set - see below####
+##### check dup cleaned URLs - remove very stubborn junk - may need to be more on whole seed set ####
 abstracts_1_4999$cleaned_URL <- gsub('\\s+', '', abstracts_1_4999$cleaned_URL)
 abstracts_1_4999 <- abstracts_1_4999[!grepl("clinicaltrials",abstracts_1_4999$cleaned_URL),]
 abstracts_1_4999 <- abstracts_1_4999[!grepl("https://www.clinicaltrials.gov",abstracts_1_4999$cleaned_URL),] ## stupidly, this is necessary
@@ -144,11 +145,14 @@ check_dup_url <- data.frame(table(abstracts_1_4999$cleaned_URL))
 keep <- select(pmc_seed, 1, 8, 9, 11, 12)
 abstracts_1_4999 <- right_join(keep, abstracts_1_4999, by ="id")
 
-## de-duplicating - newest paper may not be the resource paper
-## match strings in title and URL, will need this later anyway for naming
+#===================================================================##
+####### PART 4: Find matching strings between Titles and URLs  ####### 
+#===================================================================##
+
+## will help for 1) de-publication down to one resource per inventory and 2) for resource naming
 ## e.g. in title = "Integration of 1:1 orthology maps and updated datasets into Echinobase."
 ## URL = "https://echinobase.org"
-## => "echinobase" 
+## => "echinobase"
 
 matches  <- NULL;
 for (row in 1:nrow(abstracts_1_4999)) {
@@ -163,7 +167,7 @@ for (row in 1:nrow(abstracts_1_4999)) {
 }
 
 abstracts_1_4999 <- right_join(abstracts_1_4999, matches, by = "id")
-##abstracts_1_4999 <- select(abstracts_1_4999, 1, 6, 4, 2, 3, 5, 7, 8:14)
+abstracts_1_4999 <- select(abstracts_1_4999, 1, 6, 4, 2, 5, 3, 5, 7, 8:11)
 
 ## save file
 write.csv(abstracts_1_4999,"abstracts_1_4999_2021-08-06.csv", row.names = FALSE) 
