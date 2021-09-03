@@ -2,7 +2,7 @@
 ## Parts: 1) retrieve initial records from query, 2) retrieve abstracts, 3) extract and clean URLs from abstracts
 ## and 4) find string matches b/t title and URLs
 ## Package(s): europepmc, tidyverse, stringr, httr
-## Input file(s): manual_checks_hji_2021-07-28.csv
+## Input file(s): manual_checks_hji_2021-08-20.csv
 ## Output file(s): pmc_seed_all_2021-08-06.csv, (temp!) abstracts_1_4999_2021-08-06.csv
 ## NOTE: depending on Europe PMC query, will need to check ids that do not return w/ details, URL cleaning efficacy, etc. There
 ## are some very stubborn strings that aren't excluded in the query despite trying (especially re: clinical trial registries).
@@ -28,14 +28,14 @@ year_counts <-count(pmc_seed, pubYear) ##check for craziness
 journal_counts <-count(pmc_seed, journalTitle) ##check for craziness
 
 ##save entire seed set - update date
-write.csv(pmc_seed,"pmc_seed_all_2021-08-06.csv", row.names = FALSE) ## 21,235 total records
+write.csv(pmc_seed,"pmc_seed_all_2021-08-06.csv", row.names = FALSE) ## 21,235 total records as of date
 
 ##===========================================================================================##
 #######  PART 2: starting with entire seed set, query detailed records to get abstracts ####### 
 ##===========================================================================================##
 
 pmc_seed <- read.csv("pmc_seed_all_2021-08-06.csv")
-manual_checks <- read.csv("manual_checks_hji_2021-07-28.csv") ## manaully curated set
+manual_checks <- read.csv("manual_checks_hji_2021-08-20.csv") ## manually curated set
 
 ## using 5K records first in developing workflow
 ## include the 653 manually checked already
@@ -110,7 +110,7 @@ check_dup_id <- data.frame(table(abstracts_1_4999$id)) ## doubling checking
 ##===========================================================##
 
 url_pattern <- "http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
-abstracts_1_4999$ContentURL <- str_extract(abstracts_1_4999$abstractText, url_pattern)
+abstracts_1_4999$ContentURL <- str_extract_all(abstracts_1_4999$abstractText, url_pattern) ## extracts all URL, concatenates/comma sep 
 ##some have no URLs - there was just WWW or HTTP(S) in the abstract
 abstracts_1_4999 <- filter(abstracts_1_4999, !is.na(abstracts_1_4999$ContentURL))
 
