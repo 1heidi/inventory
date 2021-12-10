@@ -1,6 +1,4 @@
-# GBC Inventory Preliminary Exploration
-
-### Done summer/fall 2021
+### GBC Inventory Preliminary Exploration - Summer/Fall 2021
 
 #### Testing EuropePMC API and europePMC R package
 
