@@ -1,6 +1,6 @@
-# GBC Inventory
+# GBC Inventory Preliminary Exploration
 
-### Preliminary exploration for the GBC Biodata Inventory done summer/fall 2021
+### Done summer/fall 2021
 
 #### Testing EuropePMC API and europePMC R package
 
