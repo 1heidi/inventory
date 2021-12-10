@@ -10,7 +10,7 @@
 
 * Script = STEP 2
 
-* Summary: Contains expected keywords that can be used as classifiers based on observations from manual curation (e.g. 'database' = positive, 'package' = negative). Titles tested via a crude cascade with a set of 653 manually curated records (variable hji_recheck) - looks promising. Scripts for abstract not complete. Note that classifiers for title vs. abstracts different (e.g. more and more granular for abstract). Title classifiers tested are directly in code and abstracts classifers are in a file. All preliminary.
+* Summary: Contains expected keywords that can be used as classifiers based on observations from manual curation (e.g. 'database' = positive, 'package' = negative). Titles tested via a crude cascade with a set of 638 manually curated records (variable hji_recheck) - looks promising. Scripts for abstract not complete. Note that classifiers for title vs. abstracts different (e.g. more and more granular for abstract). Title classifiers tested are directly in code and abstracts classifers are in a file. All preliminary.
 
 #### Early URL processing
 
